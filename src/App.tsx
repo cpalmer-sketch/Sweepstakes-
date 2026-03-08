@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   collection, 
   onSnapshot, 
@@ -40,7 +40,11 @@ import {
   Database,
   Trophy,
   Coins,
-  ArrowUpDown
+  ArrowUpDown,
+  Bell,
+  Download,
+  Upload,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -53,6 +57,105 @@ function cn(...inputs: ClassValue[]) {
 
 // --- Types ---
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+  state: { hasError: boolean, error: Error | null } = { hasError: false, error: null };
+  props: { children: React.ReactNode };
+
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.props = props;
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      let message = "Something went wrong.";
+      try {
+        const parsed = JSON.parse(this.state.error?.message || "");
+        if (parsed.error && parsed.error.includes("insufficient permissions")) {
+          message = "You don't have permission to perform this action. If you just logged in, please wait a moment or try refreshing.";
+        }
+      } catch (e) {
+        // Not a JSON error
+      }
+
+      return (
+        <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-xl border border-red-100 text-center">
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <LogOut size={32} />
+            </div>
+            <h2 className="text-2xl font-bold text-zinc-900 mb-2">Application Error</h2>
+            <p className="text-zinc-500 mb-8">{message}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full py-3 px-6 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all"
+            >
+              Reload Application
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 interface SweepstakeSite {
   id: string;
   name: string;
@@ -63,7 +166,7 @@ interface SweepstakeSite {
   minPayoutSC: number;
   minPayoutGiftCard: number;
   minPayoutCrypto: number;
-  payoutOptions: string[];
+  payoutMethods: string[];
   processTime: string;
   signupDate: string;
   isWheelBonus: boolean;
@@ -271,6 +374,67 @@ const AnalysisModal = ({
   );
 };
 
+const BulkImportModal = ({ isOpen, onClose, onImport, isScanning }: { isOpen: boolean, onClose: () => void, onImport: (text: string) => void, isScanning: boolean }) => {
+  const [text, setText] = useState('');
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden"
+      >
+        <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-zinc-50">
+          <div>
+            <h2 className="text-xl font-bold text-zinc-900">Bulk Import Sites</h2>
+            <p className="text-xs text-zinc-500 mt-1">Paste CSV, tables, or raw text. AI will parse it automatically.</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white rounded-xl transition-colors">
+            <X size={20} className="text-zinc-400" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Paste your site data here..."
+            className="w-full h-96 p-4 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 transition-all font-mono text-xs resize-none"
+          />
+          
+          <div className="mt-6 flex items-center justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="px-6 py-3 text-sm font-bold text-zinc-500 hover:text-zinc-700 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onImport(text)}
+              disabled={isScanning || !text.trim()}
+              className="px-8 py-3 bg-indigo-600 text-white rounded-2xl font-bold text-sm hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100"
+            >
+              {isScanning ? (
+                <>
+                  <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Upload size={18} />
+                  Start Import
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 const SiteModal = ({ 
   isOpen, 
   onClose, 
@@ -289,6 +453,9 @@ const SiteModal = ({
     dailyBonus: '',
     wheelBonus: '',
     minPayoutSC: 100,
+    minPayoutGiftCard: 50,
+    minPayoutCrypto: 50,
+    payoutMethods: [],
     processTime: '1-3 Days',
     payoutSpeedRank: 3,
     isWheelBonus: false
@@ -305,6 +472,9 @@ const SiteModal = ({
         dailyBonus: '',
         wheelBonus: '',
         minPayoutSC: 100,
+        minPayoutGiftCard: 50,
+        minPayoutCrypto: 50,
+        payoutMethods: [],
         processTime: '1-3 Days',
         payoutSpeedRank: 3,
         isWheelBonus: false
@@ -373,9 +543,9 @@ const SiteModal = ({
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold uppercase text-zinc-400">Min Payout (SC)</label>
+                  <label className="text-xs font-bold uppercase text-zinc-400">Min SC</label>
                   <input 
                     type="number"
                     value={formData.minPayoutSC}
@@ -383,6 +553,35 @@ const SiteModal = ({
                     className="w-full px-4 py-2 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold uppercase text-zinc-400">Min Gift</label>
+                  <input 
+                    type="number"
+                    value={formData.minPayoutGiftCard}
+                    onChange={e => setFormData({...formData, minPayoutGiftCard: Number(e.target.value)})}
+                    className="w-full px-4 py-2 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold uppercase text-zinc-400">Min Crypto</label>
+                  <input 
+                    type="number"
+                    value={formData.minPayoutCrypto}
+                    onChange={e => setFormData({...formData, minPayoutCrypto: Number(e.target.value)})}
+                    className="w-full px-4 py-2 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase text-zinc-400">Payout Methods (comma separated)</label>
+                <input 
+                  placeholder="ACH, Crypto, Skrill, Debit..."
+                  value={formData.payoutMethods?.join(', ')}
+                  onChange={e => setFormData({...formData, payoutMethods: e.target.value.split(',').map(s => s.trim()).filter(Boolean)})}
+                  className="w-full px-4 py-2 rounded-xl border border-zinc-200 focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold uppercase text-zinc-400">Payout Speed</label>
                   <select 
@@ -439,6 +638,7 @@ interface SiteCardProps {
   onCollect: (id: string) => void;
   onVisit: (id: string) => void;
   onEdit: (site: SweepstakeSite) => void;
+  onAutoFill: (site: SweepstakeSite) => void;
   isLaunchMode?: boolean;
 }
 
@@ -448,6 +648,7 @@ const SiteCard = ({
   onCollect, 
   onVisit,
   onEdit,
+  onAutoFill,
   isLaunchMode = false 
 }: SiteCardProps) => {
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
@@ -460,9 +661,7 @@ const SiteCard = ({
            last.getFullYear() === now.getFullYear();
   }, [progress]);
 
-  const lastVisitStr = progress?.lastCollectedAt 
-    ? progress.lastCollectedAt.toDate().toLocaleString() 
-    : 'Never';
+  const lastVisitStr = getRelativeTime(progress?.lastCollectedAt || null);
 
   return (
     <motion.div 
@@ -483,13 +682,22 @@ const SiteCard = ({
             <h3 className="text-lg font-semibold text-zinc-900 group-hover:text-indigo-600 transition-colors">
               {site.name}
             </h3>
-            <button 
-              onClick={() => onEdit(site)}
-              className="p-1 text-zinc-300 hover:text-zinc-500 transition-colors"
-              title="Edit Site"
-            >
-              <Settings size={14} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button 
+                onClick={() => onAutoFill(site)}
+                className="p-1 text-zinc-300 hover:text-indigo-600 transition-colors"
+                title="AI Auto-fill missing info"
+              >
+                <Zap size={14} />
+              </button>
+              <button 
+                onClick={() => onEdit(site)}
+                className="p-1 text-zinc-300 hover:text-zinc-500 transition-colors"
+                title="Edit Site"
+              >
+                <Settings size={14} />
+              </button>
+            </div>
           </div>
           <p className="text-xs text-zinc-500 font-mono mt-0.5 truncate max-w-[200px]">
             {site.url.replace('https://', '')}
@@ -509,16 +717,30 @@ const SiteCard = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-5">
-        <div className="space-y-1">
-          <p className="text-[10px] uppercase text-zinc-400 font-bold tracking-tight">Daily Bonus</p>
-          <p className="text-sm font-medium text-zinc-700 truncate">{site.dailyBonus || site.wheelBonus}</p>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="p-2.5 bg-zinc-50 rounded-2xl border border-zinc-100">
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Daily Bonus</p>
+          <p className="text-sm font-bold text-zinc-900 truncate">{site.dailyBonus || site.wheelBonus}</p>
         </div>
-        <div className="space-y-1">
-          <p className="text-[10px] uppercase text-zinc-400 font-bold tracking-tight">Min Payout</p>
-          <p className="text-sm font-medium text-zinc-700">{site.minPayoutSC} SC</p>
+        <div className="p-2.5 bg-zinc-50 rounded-2xl border border-zinc-100">
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Min Payout</p>
+          <div className="flex flex-col gap-0.5">
+            <p className="text-[10px] font-medium text-zinc-600">SC: ${site.minPayoutSC}</p>
+            <p className="text-[10px] font-medium text-zinc-600">Gift: ${site.minPayoutGiftCard}</p>
+            <p className="text-[10px] font-medium text-zinc-600">Crypto: ${site.minPayoutCrypto}</p>
+          </div>
         </div>
       </div>
+
+      {site.payoutMethods && site.payoutMethods.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1">
+          {site.payoutMethods.map(method => (
+            <span key={method} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[9px] font-bold rounded-md uppercase">
+              {method}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="mt-auto flex items-center justify-between gap-3">
         <button
@@ -575,24 +797,306 @@ const SiteCard = ({
   );
 };
 
+const getRelativeTime = (timestamp: Timestamp | null) => {
+  if (!timestamp) return 'Never';
+  const now = new Date();
+  const date = timestamp.toDate();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+  return `${Math.floor(diffInSeconds / 86400)}d ago`;
+};
+
+const NotificationToast = ({ 
+  message, 
+  onClose 
+}: { 
+  message: string; 
+  onClose: () => void; 
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 50, x: '-50%' }}
+    animate={{ opacity: 1, y: 0, x: '-50%' }}
+    exit={{ opacity: 0, y: 50, x: '-50%' }}
+    className="fixed bottom-8 left-1/2 z-[200] bg-zinc-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10"
+  >
+    <Bell size={18} className="text-indigo-400" />
+    <span className="text-sm font-medium">{message}</span>
+    <button onClick={onClose} className="ml-2 p-1 hover:bg-white/10 rounded-lg transition-colors">
+      <LogOut size={14} className="rotate-45" />
+    </button>
+  </motion.div>
+);
+
 // --- Main App ---
 
-export default function App() {
+export default function AppWrapper() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+}
+
+function App() {
   const [user, setUser] = useState<User | null>(null);
   const [sites, setSites] = useState<SweepstakeSite[]>([]);
   const [userProgress, setUserProgress] = useState<Record<string, UserProgress>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'payout' | 'min' | 'last'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'payout' | 'min' | 'last' | 'method'>('name');
   const [filter, setFilter] = useState<'all' | 'wheel' | 'instant'>('all');
+  const [selectedMethod, setSelectedMethod] = useState<string>('all');
   const [isLaunchMode, setIsLaunchMode] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [batchSize, setBatchSize] = useState(10);
   const [isSiteModalOpen, setIsSiteModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<SweepstakeSite | undefined>();
+  const [notification, setNotification] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [minSC, setMinSC] = useState<number>(0);
+  const [minGift, setMinGift] = useState<number>(0);
+  const [minCrypto, setMinCrypto] = useState<number>(0);
+  const scanIdRef = useRef(0);
+
+  const ai = useMemo(() => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }), []);
+  
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  // Check for due bonuses
+  useEffect(() => {
+    if (!user || sites.length === 0) return;
+    const dueSites = sites.filter(site => {
+      const progress = userProgress[site.id];
+      if (!progress?.lastCollectedAt) return true;
+      const last = progress.lastCollectedAt.toDate();
+      const now = new Date();
+      const diff = now.getTime() - last.getTime();
+      return diff > 24 * 60 * 60 * 1000; // 24 hours
+    });
+
+    if (dueSites.length > 0) {
+      setNotification(`${dueSites.length} sites are due for daily bonuses!`);
+    }
+  }, [user, sites, userProgress]);
+
+  const handleDeepScan = async () => {
+    if (!searchTerm || searchTerm.length < 3) {
+      setNotification("Please enter a site name or URL to scan.");
+      return;
+    }
+
+    const currentScanId = ++scanIdRef.current;
+    setIsScanning(true);
+    setNotification(`Scanning web for information about "${searchTerm}"...`);
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Find detailed information about the sweepstakes casino site "${searchTerm}". 
+        Return a JSON object with these fields:
+        - name: string
+        - url: string (official homepage)
+        - welcomeBonus: string
+        - dailyBonus: string
+        - wheelBonus: string
+        - minPayoutSC: number
+        - minPayoutGiftCard: number
+        - minPayoutCrypto: number
+        - payoutMethods: string[]
+        - processTime: string
+        - payoutSpeedRank: number (1: Instant, 2: <24h, 3: 1-3 days, 4: 3-5 days, 5: 5+ days)
+        - isWheelBonus: boolean`,
+        config: {
+          tools: [{ googleSearch: {} }],
+          responseMimeType: "application/json"
+        }
+      });
+
+      if (currentScanId !== scanIdRef.current) return;
+
+      const data = JSON.parse(response.text);
+      if (data && data.name) {
+        const existing = sites.find(s => s.name.toLowerCase() === data.name.toLowerCase() || s.url.includes(data.url));
+        
+        if (existing) {
+          const siteRef = doc(db, 'sites', existing.id);
+          await updateDoc(siteRef, {
+            ...data,
+            updatedAt: serverTimestamp()
+          });
+          setNotification(`Updated information for ${data.name}!`);
+        } else {
+          const sitesRef = collection(db, 'sites');
+          await setDoc(doc(sitesRef), {
+            ...data,
+            createdAt: serverTimestamp(),
+            signupDate: new Date().toISOString()
+          });
+          setNotification(`Discovered and added new site: ${data.name}!`);
+        }
+        setSearchTerm(''); // Clear search to show full list with new site
+      }
+    } catch (error) {
+      if (currentScanId !== scanIdRef.current) return;
+      console.error("AI Scan failed:", error);
+      setNotification("Failed to discover site info. Try a more specific name.");
+    } finally {
+      if (currentScanId === scanIdRef.current) {
+        setIsScanning(false);
+      }
+    }
+  };
+
+  const handleAutoFill = async (site: SweepstakeSite) => {
+    const currentScanId = ++scanIdRef.current;
+    setIsScanning(true);
+    setNotification(`Enriching data for ${site.name}...`);
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Find missing or updated information for the sweepstakes site "${site.name}" (${site.url}). 
+        Focus on payout minimums, methods, and daily bonus amounts.
+        Return a JSON object with updated fields.`,
+        config: {
+          tools: [{ googleSearch: {} }],
+          responseMimeType: "application/json"
+        }
+      });
+
+      if (currentScanId !== scanIdRef.current) return;
+
+      const data = JSON.parse(response.text);
+      const siteRef = doc(db, 'sites', site.id);
+      await updateDoc(siteRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+      setNotification(`Enriched data for ${site.name}!`);
+    } catch (error) {
+      if (currentScanId !== scanIdRef.current) return;
+      console.error("Auto-fill failed:", error);
+      setNotification("Failed to auto-fill data.");
+    } finally {
+      if (currentScanId === scanIdRef.current) {
+        setIsScanning(false);
+      }
+    }
+  };
+
+  const stopScan = () => {
+    scanIdRef.current++;
+    setIsScanning(false);
+    setNotification("Scan stopped.");
+  };
+
+  const handleBackup = () => {
+    try {
+      const dataStr = JSON.stringify(sites, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+      
+      const exportFileDefaultName = `sweepstakes_backup_${new Date().toISOString().split('T')[0]}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+      
+      setNotification("Backup downloaded successfully!");
+    } catch (error) {
+      console.error("Backup failed:", error);
+      setNotification("Failed to create backup.");
+    }
+  };
+
+  const handleBulkImport = async (text: string) => {
+    if (!text.trim()) return;
+    setIsScanning(true);
+    setNotification("Parsing bulk data with AI... this may take a moment.");
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Parse the following sweepstakes site data into a JSON array of objects.
+        Each object should follow this structure:
+        {
+          "name": string,
+          "url": string,
+          "welcomeBonus": string,
+          "dailyBonus": string,
+          "wheelBonus": string,
+          "minPayoutSC": number,
+          "minPayoutGiftCard": number,
+          "minPayoutCrypto": number,
+          "payoutMethods": string[],
+          "processTime": string,
+          "payoutSpeedRank": number (1-5),
+          "isWheelBonus": boolean
+        }
+        
+        Data to parse:
+        ${text}
+        
+        Infer missing values where possible based on common knowledge of these sites. 
+        If a value is unknown, use reasonable defaults (e.g., 100 for minPayoutSC, 3 for payoutSpeedRank).
+        Return ONLY the JSON array.`,
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+
+      const newSites = JSON.parse(response.text);
+      if (Array.isArray(newSites)) {
+        const batch = writeBatch(db);
+        let addedCount = 0;
+        let updatedCount = 0;
+
+        for (const siteData of newSites) {
+          const existing = sites.find(s => 
+            s.name.toLowerCase() === siteData.name.toLowerCase() || 
+            (siteData.url && s.url.toLowerCase().includes(siteData.url.toLowerCase()))
+          );
+          
+          if (existing) {
+            const siteRef = doc(db, 'sites', existing.id);
+            batch.update(siteRef, { 
+              ...siteData, 
+              updatedAt: serverTimestamp() 
+            });
+            updatedCount++;
+          } else {
+            const siteRef = doc(collection(db, 'sites'));
+            batch.set(siteRef, { 
+              ...siteData, 
+              createdAt: serverTimestamp(),
+              signupDate: new Date().toISOString()
+            });
+            addedCount++;
+          }
+        }
+        await batch.commit();
+        setNotification(`Bulk import complete: ${addedCount} added, ${updatedCount} updated.`);
+      }
+    } catch (error) {
+      console.error("Bulk import failed:", error);
+      setNotification("Failed to parse or import data. Check console for details.");
+    } finally {
+      setIsScanning(false);
+      setIsImportModalOpen(false);
+    }
+  };
 
   const handleSaveSite = async (siteData: Partial<SweepstakeSite>) => {
     if (!user) return;
+    const path = editingSite ? `sites/${editingSite.id}` : 'sites';
     try {
       if (editingSite) {
         const siteRef = doc(db, 'sites', editingSite.id);
@@ -608,19 +1112,32 @@ export default function App() {
           signupDate: new Date().toISOString()
         });
       }
+      setNotification("Site saved successfully!");
     } catch (error) {
-      console.error("Error saving site:", error);
+      handleFirestoreError(error, OperationType.WRITE, path);
     }
   };
 
   const handleLaunchBatch = () => {
     const start = currentIndex;
     const end = Math.min(start + batchSize, filteredSites.length);
-    for (let i = start; i < end; i++) {
-      window.open(filteredSites[i].url, '_blank');
-      handleVisit(filteredSites[i].id);
+    
+    if (filteredSites.length === 0) {
+      setNotification("No sites to launch in current filter.");
+      return;
     }
-    setCurrentIndex(end - 1);
+
+    setNotification(`Launching ${end - start} sites. Please allow popups!`);
+    
+    // Use a small timeout to avoid some browser blocks, though still risky
+    filteredSites.slice(start, end).forEach((site, index) => {
+      setTimeout(() => {
+        window.open(site.url, '_blank');
+        handleVisit(site.id);
+      }, index * 300);
+    });
+    
+    setCurrentIndex(Math.min(end, filteredSites.length - 1));
   };
 
   // Auth Listener
@@ -634,9 +1151,12 @@ export default function App() {
   // Fetch Sites
   useEffect(() => {
     if (!user) return;
-    const unsubscribe = onSnapshot(collection(db, 'sites'), (snapshot) => {
+    const path = 'sites';
+    const unsubscribe = onSnapshot(collection(db, path), (snapshot) => {
       const sitesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SweepstakeSite));
       setSites(sitesData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
     });
     return unsubscribe;
   }, [user]);
@@ -644,12 +1164,15 @@ export default function App() {
   // Fetch User Progress
   useEffect(() => {
     if (!user) return;
-    const unsubscribe = onSnapshot(collection(db, `users/${user.uid}/progress`), (snapshot) => {
+    const path = `users/${user.uid}/progress`;
+    const unsubscribe = onSnapshot(collection(db, path), (snapshot) => {
       const progressMap: Record<string, UserProgress> = {};
       snapshot.docs.forEach(doc => {
         progressMap[doc.id] = doc.data() as UserProgress;
       });
       setUserProgress(progressMap);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
     });
     return unsubscribe;
   }, [user]);
@@ -666,33 +1189,45 @@ export default function App() {
   const handleLogout = () => auth.signOut();
 
   const seedDatabase = async () => {
-    const batch = writeBatch(db);
-    INITIAL_SITES_DATA.forEach((site) => {
-      const siteRef = doc(collection(db, 'sites'));
-      batch.set(siteRef, {
-        ...site,
-        signupDate: new Date().toISOString()
+    const path = 'sites';
+    try {
+      const batch = writeBatch(db);
+      INITIAL_SITES_DATA.forEach((site) => {
+        const siteRef = doc(collection(db, 'sites'));
+        batch.set(siteRef, {
+          ...site,
+          signupDate: new Date().toISOString()
+        });
       });
-    });
-    await batch.commit();
+      await batch.commit();
+      setNotification("Database seeded with 80+ sites!");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
   };
 
   const handleCollect = async (siteId: string) => {
     if (!user) return;
+    const path = `users/${user.uid}/progress/${siteId}`;
     const progressRef = doc(db, `users/${user.uid}/progress`, siteId);
     const existing = userProgress[siteId];
     
-    if (existing) {
-      await updateDoc(progressRef, {
-        lastCollectedAt: serverTimestamp(),
-        visitCount: (existing.visitCount || 0) + 1
-      });
-    } else {
-      await setDoc(progressRef, {
-        siteId,
-        lastCollectedAt: serverTimestamp(),
-        visitCount: 1
-      });
+    try {
+      if (existing) {
+        await updateDoc(progressRef, {
+          lastCollectedAt: serverTimestamp(),
+          visitCount: (existing.visitCount || 0) + 1
+        });
+      } else {
+        await setDoc(progressRef, {
+          siteId,
+          lastCollectedAt: serverTimestamp(),
+          visitCount: 1
+        });
+      }
+      setNotification("Bonus collected successfully!");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
     }
 
     if (isLaunchMode && currentIndex < filteredSites.length - 1) {
@@ -704,35 +1239,59 @@ export default function App() {
 
   const handleVisit = async (siteId: string) => {
     if (!user) return;
+    const path = `users/${user.uid}/progress/${siteId}`;
     const progressRef = doc(db, `users/${user.uid}/progress`, siteId);
     const existing = userProgress[siteId];
     
-    if (existing) {
-      await updateDoc(progressRef, {
-        visitCount: (existing.visitCount || 0) + 1
-      });
-    } else {
-      await setDoc(progressRef, {
-        siteId,
-        lastCollectedAt: null,
-        visitCount: 1
-      });
+    try {
+      if (existing) {
+        await updateDoc(progressRef, {
+          visitCount: (existing.visitCount || 0) + 1
+        });
+      } else {
+        await setDoc(progressRef, {
+          siteId,
+          lastCollectedAt: null,
+          visitCount: 1
+        });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
     }
   };
+
+  const allMethods = useMemo(() => {
+    const methods = new Set<string>();
+    sites.forEach(s => s.payoutMethods?.forEach(m => methods.add(m)));
+    return Array.from(methods).sort();
+  }, [sites]);
 
   const filteredSites = useMemo(() => {
     let result = sites.filter(s => 
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.url.toLowerCase().includes(searchTerm.toLowerCase())
+      s.url.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.payoutMethods?.some(m => m.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     if (filter === 'wheel') result = result.filter(s => s.isWheelBonus);
     if (filter === 'instant') result = result.filter(s => s.payoutSpeedRank === 1);
+    if (selectedMethod !== 'all') {
+      result = result.filter(s => s.payoutMethods?.includes(selectedMethod));
+    }
+
+    if (minSC > 0) result = result.filter(s => s.minPayoutSC <= minSC);
+    if (minGift > 0) result = result.filter(s => s.minPayoutGiftCard <= minGift);
+    if (minCrypto > 0) result = result.filter(s => s.minPayoutCrypto <= minCrypto);
 
     return result.sort((a, b) => {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
       if (sortBy === 'payout') return a.payoutSpeedRank - b.payoutSpeedRank;
       if (sortBy === 'min') return a.minPayoutSC - b.minPayoutSC;
+      if (sortBy === 'method') {
+        const methodA = a.payoutMethods?.[0] || 'zzz';
+        const methodB = b.payoutMethods?.[0] || 'zzz';
+        return methodA.localeCompare(methodB);
+      }
       if (sortBy === 'last') {
         const lastA = userProgress[a.id]?.lastCollectedAt?.toMillis() || 0;
         const lastB = userProgress[b.id]?.lastCollectedAt?.toMillis() || 0;
@@ -740,7 +1299,7 @@ export default function App() {
       }
       return 0;
     });
-  }, [sites, searchTerm, sortBy, filter, userProgress]);
+  }, [sites, searchTerm, sortBy, filter, userProgress, selectedMethod, minSC, minGift, minCrypto]);
 
   const stats = useMemo(() => {
     const total = sites.length;
@@ -752,7 +1311,13 @@ export default function App() {
              last.getMonth() === now.getMonth() && 
              last.getFullYear() === now.getFullYear();
     }).length;
-    return { total, collectedToday };
+
+    const totalDailyPotential = sites.reduce((acc, s) => {
+      const val = parseFloat(s.dailyBonus.replace(/[^0-9.]/g, '')) || 0;
+      return acc + val;
+    }, 0);
+
+    return { total, collectedToday, totalDailyPotential };
   }, [sites, userProgress]);
 
   if (loading) {
@@ -814,12 +1379,32 @@ export default function App() {
               <Database size={16} />
               Add Site
             </button>
-            <div className="hidden md:flex items-center gap-6 mr-6">
-              <div className="text-right">
-                <p className="text-[10px] text-zinc-400 font-bold uppercase">Progress</p>
-                <p className="text-sm font-bold text-indigo-600">{stats.collectedToday} / {stats.total}</p>
-              </div>
-              <div className="w-32 h-2 bg-zinc-100 rounded-full overflow-hidden">
+            <button
+              onClick={handleBackup}
+              className="flex items-center gap-2 py-2 px-4 bg-zinc-50 text-zinc-600 rounded-xl font-bold text-sm hover:bg-zinc-100 transition-all"
+              title="Backup sites to JSON"
+            >
+              <Download size={16} />
+              Backup
+            </button>
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center gap-2 py-2 px-4 bg-zinc-50 text-zinc-600 rounded-xl font-bold text-sm hover:bg-zinc-100 transition-all"
+              title="Bulk import sites from text"
+            >
+              <Upload size={16} />
+              Import
+            </button>
+              <div className="hidden md:flex items-center gap-6 mr-6">
+                <div className="text-right">
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase">Daily Potential</p>
+                  <p className="text-sm font-bold text-emerald-600">${stats.totalDailyPotential.toFixed(2)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-zinc-400 font-bold uppercase">Progress</p>
+                  <p className="text-sm font-bold text-indigo-600">{stats.collectedToday} / {stats.total}</p>
+                </div>
+                <div className="w-32 h-2 bg-zinc-100 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${(stats.collectedToday / stats.total) * 100}%` }}
@@ -850,11 +1435,54 @@ export default function App() {
                 placeholder="Search sites or URLs..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-white border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-50/50 focus:border-indigo-600 transition-all shadow-sm"
+                className="w-full pl-12 pr-32 py-3 bg-white border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-50/50 focus:border-indigo-600 transition-all shadow-sm"
               />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {searchTerm && !isScanning && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="p-1.5 text-zinc-300 hover:text-zinc-500 transition-colors"
+                    title="Clear search"
+                  >
+                    <LogOut size={14} className="rotate-45" />
+                  </button>
+                )}
+                {isScanning && (
+                  <button
+                    onClick={stopScan}
+                    className="px-2 py-1.5 bg-red-500 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-red-600 transition-all flex items-center gap-1"
+                  >
+                    <LogOut size={12} className="rotate-90" />
+                    Stop
+                  </button>
+                )}
+                <button
+                  onClick={handleDeepScan}
+                  disabled={isScanning}
+                  className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center gap-1.5"
+                >
+                  {isScanning ? (
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
+                  ) : <Zap size={12} />}
+                  Scan
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex bg-white p-1 rounded-2xl border border-zinc-200 shadow-sm">
+                <select
+                  value={selectedMethod}
+                  onChange={(e) => setSelectedMethod(e.target.value)}
+                  className="px-4 py-2 bg-transparent text-xs font-bold uppercase tracking-wider outline-none text-zinc-600 cursor-pointer"
+                >
+                  <option value="all">All Methods</option>
+                  {allMethods.map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="flex bg-white p-1 rounded-2xl border border-zinc-200 shadow-sm">
                 {(['all', 'wheel', 'instant'] as const).map((f) => (
                   <button
@@ -871,7 +1499,7 @@ export default function App() {
               </div>
 
               <div className="flex bg-white p-1 rounded-2xl border border-zinc-200 shadow-sm">
-                {(['name', 'payout', 'min', 'last'] as const).map((s) => (
+                {(['name', 'payout', 'min', 'last', 'method'] as const).map((s) => (
                   <button
                     key={s}
                     onClick={() => setSortBy(s)}
@@ -884,6 +1512,52 @@ export default function App() {
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 p-4 bg-white rounded-3xl border border-zinc-200 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Max Payout:</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-zinc-500">SC</span>
+                <input 
+                  type="number" 
+                  value={minSC || ''} 
+                  onChange={(e) => setMinSC(Number(e.target.value))}
+                  placeholder="Any"
+                  className="w-16 px-2 py-1 bg-zinc-50 border border-zinc-100 rounded-lg text-[10px] font-bold focus:outline-none focus:border-indigo-600"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-zinc-500">Gift</span>
+                <input 
+                  type="number" 
+                  value={minGift || ''} 
+                  onChange={(e) => setMinGift(Number(e.target.value))}
+                  placeholder="Any"
+                  className="w-16 px-2 py-1 bg-zinc-50 border border-zinc-100 rounded-lg text-[10px] font-bold focus:outline-none focus:border-indigo-600"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-zinc-500">Crypto</span>
+                <input 
+                  type="number" 
+                  value={minCrypto || ''} 
+                  onChange={(e) => setMinCrypto(Number(e.target.value))}
+                  placeholder="Any"
+                  className="w-16 px-2 py-1 bg-zinc-50 border border-zinc-100 rounded-lg text-[10px] font-bold focus:outline-none focus:border-indigo-600"
+                />
+              </div>
+              {(minSC > 0 || minGift > 0 || minCrypto > 0) && (
+                <button 
+                  onClick={() => { setMinSC(0); setMinGift(0); setMinCrypto(0); }}
+                  className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 underline"
+                >
+                  Clear
+                </button>
+              )}
             </div>
           </div>
 
@@ -1027,6 +1701,7 @@ export default function App() {
                     setEditingSite(s);
                     setIsSiteModalOpen(true);
                   }}
+                  onAutoFill={handleAutoFill}
                   isLaunchMode={isLaunchMode}
                 />
               ))}
@@ -1041,6 +1716,22 @@ export default function App() {
         onSave={handleSaveSite}
         site={editingSite}
       />
+
+      <BulkImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleBulkImport}
+        isScanning={isScanning}
+      />
+
+      <AnimatePresence>
+        {notification && (
+          <NotificationToast 
+            message={notification} 
+            onClose={() => setNotification(null)} 
+          />
+        )}
+      </AnimatePresence>
 
       {/* Footer */}
       <footer className="mt-20 py-12 border-t border-zinc-100 bg-white">

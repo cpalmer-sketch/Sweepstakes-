@@ -13,7 +13,7 @@
         "minPayoutSC": { "type": "number", "description": "Minimum payout for SC." },
         "minPayoutGiftCard": { "type": "number", "description": "Minimum payout for gift cards." },
         "minPayoutCrypto": { "type": "number", "description": "Minimum payout for crypto." },
-        "payoutOptions": { "type": "array", "items": { "type": "string" }, "description": "Available payout methods." },
+        "payoutMethods": { "type": "array", "items": { "type": "string" }, "description": "Available payout methods." },
         "processTime": { "type": "string", "description": "Processing time for payouts." },
         "signupDate": { "type": "string", "description": "Date of sign up and profile creation." },
         "lastCollectedAt": { "type": "string", "format": "date-time", "description": "The last time the daily bonus was collected." },

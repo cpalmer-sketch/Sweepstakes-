@@ -10,15 +10,27 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Sites: Read-only for authenticated users, write-only for admins (manual setup)
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "cpalmer65441@gmail.com" && request.auth.token.email_verified == true);
+    }
+
+    // Sites: Read for all authenticated, write for admins
     match /sites/{siteId} {
       allow read: if isAuthenticated();
-      allow write: if false; // Only manual admin updates for now
+      allow write: if isAdmin();
     }
 
     // User Progress: Only the user can read/write their own progress
     match /users/{userId}/progress/{progressId} {
       allow read, write: if isOwner(userId);
+    }
+    
+    // User Profile: Basic role check
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
     }
   }
 }
