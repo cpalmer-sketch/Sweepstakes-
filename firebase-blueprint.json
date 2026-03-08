@@ -36,7 +36,8 @@
         "hasAccount": { "type": "boolean", "description": "Whether the user has an active profile on this site." },
         "encryptedUsername": { "type": "string", "description": "AES encrypted username." },
         "encryptedPassword": { "type": "string", "description": "AES encrypted password." },
-        "currentBalance": { "type": "number", "description": "The user's current balance on this site." }
+        "currentBalance": { "type": "number", "description": "The user's current balance on this site." },
+        "isFavorite": { "type": "boolean", "description": "Whether the site is a user favorite." }
       },
       "required": ["userId", "siteId"]
     }

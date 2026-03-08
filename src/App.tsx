@@ -50,7 +50,8 @@ import {
   Eye,
   EyeOff,
   Shield,
-  ShieldCheck
+  ShieldCheck,
+  Star
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -190,6 +191,7 @@ interface UserProgress {
   encryptedUsername?: string;
   encryptedPassword?: string;
   currentBalance?: number;
+  isFavorite?: boolean;
 }
 
 // --- Initial Data (80+ sites) ---
@@ -894,6 +896,7 @@ interface SiteCardProps {
   onToggleAccount: (id: string, current: boolean) => void;
   onOpenVault: (site: SweepstakeSite) => void;
   onUpdateBalance: (id: string, balance: number) => void;
+  onToggleFavorite: (id: string, current: boolean) => void;
   getBonusStatus: (site: SweepstakeSite) => 'ready' | 'soon' | 'collected';
   isLaunchMode?: boolean;
 }
@@ -919,6 +922,7 @@ const SiteCard = ({
   onToggleAccount,
   onOpenVault,
   onUpdateBalance,
+  onToggleFavorite,
   getBonusStatus,
   isLaunchMode = false 
 }: SiteCardProps) => {
@@ -985,6 +989,16 @@ const SiteCard = ({
               {site.name}
             </h3>
             <div className="flex items-center gap-1">
+              <button 
+                onClick={() => onToggleFavorite(site.id, !!progress?.isFavorite)}
+                className={cn(
+                  "p-1 transition-colors",
+                  progress?.isFavorite ? "text-amber-500" : "text-zinc-300 hover:text-amber-400"
+                )}
+                title={progress?.isFavorite ? "Remove from Favorites" : "Add to Favorites (Max 10)"}
+              >
+                <Star size={14} fill={progress?.isFavorite ? "currentColor" : "none"} />
+              </button>
               <button 
                 onClick={() => onToggleAccount(site.id, !!progress?.hasAccount)}
                 className={cn(
@@ -1204,7 +1218,7 @@ function App() {
   const [userProgress, setUserProgress] = useState<Record<string, UserProgress>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'payout' | 'min' | 'last' | 'method' | 'welcome' | 'daily' | 'minGC' | 'minCrypto' | 'due' | 'value' | 'progress'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'payout' | 'min' | 'last' | 'method' | 'welcome' | 'daily' | 'minGC' | 'minCrypto' | 'due' | 'value' | 'progress' | 'favorites'>('value');
   const [filter, setFilter] = useState<'all' | 'active' | 'signup'>('all');
   const [selectedMethod, setSelectedMethod] = useState<string>('all');
   const [isLaunchMode, setIsLaunchMode] = useState(false);
@@ -1736,17 +1750,36 @@ function App() {
   };
 
   const handleMorningRoutine = () => {
-    // Open top 5 reliable sites (Stake, Chumba, Pulsz, etc.)
-    const reliable = ['Stake.us', 'Chumba', 'Pulsz Casino', 'McLuck', 'Fortune Coins'];
-    const routineSites = sites.filter(s => reliable.some(r => s.name.includes(r))).slice(0, 5);
+    // Open user's favorite sites (up to 10)
+    const favoriteSites = sites.filter(s => userProgress[s.id]?.isFavorite).slice(0, 10);
     
-    if (routineSites.length === 0) {
-      setNotification("No routine sites found. Add them to your list first!");
+    if (favoriteSites.length === 0) {
+      setNotification("No favorite sites found. Star some sites to add them to your routine!");
       return;
     }
     
-    routineSites.forEach(s => window.open(s.url, '_blank'));
-    setNotification(`Launched ${routineSites.length} routine sites!`);
+    favoriteSites.forEach(s => window.open(s.url, '_blank'));
+    setNotification(`Launched ${favoriteSites.length} favorite sites!`);
+  };
+
+  const handleToggleFavorite = async (siteId: string, current: boolean) => {
+    if (!user) return;
+    
+    // Check if user already has 10 favorites
+    const favoriteCount = Object.values(userProgress).filter((p: UserProgress) => p.isFavorite).length;
+    if (!current && favoriteCount >= 10) {
+      setNotification("You can only have up to 10 favorite sites.");
+      return;
+    }
+
+    const path = `users/${user.uid}/progress/${siteId}`;
+    const progressRef = doc(db, `users/${user.uid}/progress`, siteId);
+    try {
+      await setDoc(progressRef, { isFavorite: !current }, { merge: true });
+      setNotification(!current ? "Added to favorites!" : "Removed from favorites");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
   };
 
   const handleUpdateBalance = async (siteId: string, balance: number) => {
@@ -1809,6 +1842,13 @@ function App() {
         const lastB = userProgress[b.id]?.lastCollectedAt?.toMillis() || 0;
         return lastA - lastB;
       }
+      if (sortBy === 'favorites') {
+        const favA = userProgress[a.id]?.isFavorite ? 1 : 0;
+        const favB = userProgress[b.id]?.isFavorite ? 1 : 0;
+        if (favA !== favB) return favB - favA;
+        return a.name.localeCompare(b.name);
+      }
+      
       if (sortBy === 'value') {
         return calculateValueScore(b) - calculateValueScore(a);
       }
@@ -1901,7 +1941,7 @@ function App() {
             <button
               onClick={handleMorningRoutine}
               className="flex items-center gap-2 py-2 px-4 bg-amber-50 text-amber-600 rounded-xl font-bold text-sm hover:bg-amber-100 transition-all"
-              title="Open top 5 reliable sites"
+              title="Open your favorite sites (Max 10)"
             >
               <Zap size={16} />
               Morning Routine
@@ -2025,6 +2065,7 @@ function App() {
                   className="px-2 py-2 bg-transparent text-xs font-bold uppercase tracking-wider outline-none text-zinc-600 cursor-pointer"
                 >
                   <option value="name">Name</option>
+                  <option value="favorites">Favorites (Routine)</option>
                   <option value="value">Value Score</option>
                   <option value="progress">Cashout Progress</option>
                   <option value="welcome">Welcome Bonus</option>
@@ -2341,6 +2382,7 @@ function App() {
                     setIsVaultModalOpen(true);
                   }}
                   onUpdateBalance={handleUpdateBalance}
+                  onToggleFavorite={handleToggleFavorite}
                   getBonusStatus={getBonusStatus}
                   isLaunchMode={isLaunchMode}
                 />
