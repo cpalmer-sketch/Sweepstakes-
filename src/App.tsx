@@ -49,7 +49,8 @@ import {
   Unlock,
   Eye,
   EyeOff,
-  Shield
+  Shield,
+  ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
@@ -177,6 +178,8 @@ interface SweepstakeSite {
   signupDate: string;
   isWheelBonus: boolean;
   payoutSpeedRank: number; // 1: Instant, 2: <24h, 3: 1-3 days, 4: 3-5 days, 5: 5+ days
+  resetStyle?: 'fixed' | 'rolling';
+  resetTimeEST?: string; // e.g. "00:00"
 }
 
 interface UserProgress {
@@ -186,6 +189,7 @@ interface UserProgress {
   hasAccount: boolean;
   encryptedUsername?: string;
   encryptedPassword?: string;
+  currentBalance?: number;
 }
 
 // --- Initial Data (80+ sites) ---
@@ -195,10 +199,10 @@ const INITIAL_SITES_DATA: Partial<SweepstakeSite>[] = [
   { name: "BigPirate", url: "https://bigpirate.com", welcomeBonus: "3 Rum + 360k GC", dailyBonus: "-", wheelBonus: "Daily Login (Varies)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
   { name: "Cazino", url: "https://cazino.com", welcomeBonus: "1 SC + 1k LC", dailyBonus: "-", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "3 Days", payoutSpeedRank: 4 },
   { name: "Chip'n Win", url: "https://chipnwin.com", welcomeBonus: "15k GC + 15 Crystals", dailyBonus: "-", wheelBonus: "Daily Wheel (Up to 5 SC)", minPayoutSC: 100, processTime: "2-3 Days", payoutSpeedRank: 3, isWheelBonus: true },
-  { name: "Chumba", url: "https://chumbacasino.com", welcomeBonus: "2 SC + 2M GC", dailyBonus: "1 SC", wheelBonus: "-", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
-  { name: "Clubs Casino", url: "https://clubscasino.com", welcomeBonus: "20 Free Spins (SC)", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "1-3 Days", payoutSpeedRank: 3 },
-  { name: "Cluck Casino", url: "https://cluck.us", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.20 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 75, processTime: "4-24 Hours", payoutSpeedRank: 2 },
-  { name: "CrownCoins", url: "https://crowncoinscasino.com", welcomeBonus: "2 SC + 100k CC", dailyBonus: "Progressive 0.50 SC - 1.5 SC", wheelBonus: "-", minPayoutSC: 50, processTime: "2-12 Hours", payoutSpeedRank: 2 },
+  { name: "Chumba", url: "https://chumbacasino.com", welcomeBonus: "2 SC + 2M GC", dailyBonus: "1 SC", wheelBonus: "-", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3, resetStyle: 'fixed', resetTimeEST: '00:00' },
+  { name: "Clubs Casino", url: "https://clubscasino.com", welcomeBonus: "20 Free Spins (SC)", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "1-3 Days", payoutSpeedRank: 3, resetStyle: 'rolling' },
+  { name: "Cluck Casino", url: "https://cluck.us", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.20 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 75, processTime: "4-24 Hours", payoutSpeedRank: 2, resetStyle: 'rolling' },
+  { name: "CrownCoins", url: "https://crowncoinscasino.com", welcomeBonus: "2 SC + 100k CC", dailyBonus: "Progressive 0.50 SC - 1.5 SC", wheelBonus: "-", minPayoutSC: 50, processTime: "2-12 Hours", payoutSpeedRank: 2, resetStyle: 'fixed', resetTimeEST: '00:00' },
   { name: "Dara Casino", url: "https://daracasino.com", welcomeBonus: "2 SC + 100k GC", dailyBonus: "Twice Daily 1 SC", wheelBonus: "2x Daily Login (Progressive)", minPayoutSC: 100, processTime: "2-5 Days", payoutSpeedRank: 4 },
   { name: "DimeSweeps", url: "https://dimesweeps.com", welcomeBonus: "1 SC + 50k GC", dailyBonus: "-", wheelBonus: "Daily Progressive (Rising)", minPayoutSC: 50, processTime: "2-7 Days", payoutSpeedRank: 4 },
   { name: "DingDingDing", url: "https://dingdingdingcasino.com", welcomeBonus: "5 SC + 100k GC", dailyBonus: "1 SC", wheelBonus: "Daily Login (Progressive)", minPayoutSC: 100, processTime: "3-5 Days", payoutSpeedRank: 4 },
@@ -889,6 +893,8 @@ interface SiteCardProps {
   onAutoFill: (site: SweepstakeSite) => void;
   onToggleAccount: (id: string, current: boolean) => void;
   onOpenVault: (site: SweepstakeSite) => void;
+  onUpdateBalance: (id: string, balance: number) => void;
+  getBonusStatus: (site: SweepstakeSite) => 'ready' | 'soon' | 'collected';
   isLaunchMode?: boolean;
 }
 
@@ -912,19 +918,43 @@ const SiteCard = ({
   onAutoFill,
   onToggleAccount,
   onOpenVault,
+  onUpdateBalance,
+  getBonusStatus,
   isLaunchMode = false 
 }: SiteCardProps) => {
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
-  const isCollectedToday = useMemo(() => {
-    if (!progress?.lastCollectedAt) return false;
-    const last = progress.lastCollectedAt.toDate();
-    const now = new Date();
-    return last.getDate() === now.getDate() && 
-           last.getMonth() === now.getMonth() && 
-           last.getFullYear() === now.getFullYear();
-  }, [progress]);
+  const [isEditingBalance, setIsEditingBalance] = useState(false);
+  const [tempBalance, setTempBalance] = useState(progress?.currentBalance?.toString() || '0');
+
+  const bonusStatus = getBonusStatus(site);
+  
+  const statusColors = {
+    ready: "bg-emerald-500 shadow-emerald-200",
+    soon: "bg-amber-500 shadow-amber-200",
+    collected: "bg-rose-500 shadow-rose-200"
+  };
+
+  const statusLabels = {
+    ready: "Ready Now",
+    soon: "Ready Soon",
+    collected: "Claimed"
+  };
+
+  const minPayout = site.minPayoutSC || 100;
+  const currentBalance = progress?.currentBalance || 0;
+  const progressPercent = Math.min(100, (currentBalance / minPayout) * 100);
+  const isNearCashout = progressPercent >= 90;
 
   const lastVisitStr = getRelativeTime(progress?.lastCollectedAt || null);
+
+  const handleBalanceSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseFloat(tempBalance);
+    if (!isNaN(val)) {
+      onUpdateBalance(site.id, val);
+    }
+    setIsEditingBalance(false);
+  };
 
   return (
     <motion.div 
@@ -933,16 +963,25 @@ const SiteCard = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       className={cn(
-        "group relative flex flex-col p-5 rounded-2xl border transition-all duration-300",
-        isCollectedToday 
-          ? "bg-emerald-50/50 border-emerald-100" 
-          : "bg-white border-zinc-100 shadow-sm hover:shadow-md hover:border-zinc-200"
+        "group relative flex flex-col p-5 rounded-3xl border transition-all duration-300",
+        isNearCashout ? "border-amber-400 bg-amber-50/30 ring-4 ring-amber-100/50" : 
+        bonusStatus === 'ready' ? "bg-emerald-50/30 border-emerald-100" : "bg-white border-zinc-100 shadow-sm hover:shadow-md hover:border-zinc-200"
       )}
     >
+      {/* Status Indicator Dot */}
+      <div className="absolute -top-1 -left-1 flex items-center gap-2">
+        <div className={cn("w-4 h-4 rounded-full border-2 border-white shadow-lg", statusColors[bonusStatus])} />
+        {isNearCashout && (
+          <div className="px-2 py-0.5 bg-amber-500 text-white text-[9px] font-black uppercase rounded-full shadow-lg animate-pulse">
+            Near Cashout
+          </div>
+        )}
+      </div>
+
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold text-zinc-900 group-hover:text-indigo-600 transition-colors">
+            <h3 className="text-lg font-black text-zinc-900 group-hover:text-indigo-600 transition-colors leading-tight">
               {site.name}
             </h3>
             <div className="flex items-center gap-1">
@@ -959,20 +998,6 @@ const SiteCard = ({
                 {progress?.hasAccount ? "Active" : "Signup"}
               </button>
               <button 
-                onClick={() => onAutoFill(site)}
-                className="p-1 text-zinc-300 hover:text-indigo-600 transition-colors"
-                title="AI Auto-fill missing info"
-              >
-                <Zap size={14} />
-              </button>
-              <button 
-                onClick={() => onEdit(site)}
-                className="p-1 text-zinc-300 hover:text-zinc-500 transition-colors"
-                title="Edit Site"
-              >
-                <Settings size={14} />
-              </button>
-              <button 
                 onClick={() => onOpenVault(site)}
                 className={cn(
                   "p-1 transition-colors",
@@ -984,82 +1009,129 @@ const SiteCard = ({
               </button>
             </div>
           </div>
-          <p className="text-xs text-zinc-500 font-mono mt-0.5 truncate max-w-[200px]">
-            {site.url.replace('https://', '')}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="p-2.5 bg-zinc-50 rounded-2xl border border-zinc-100">
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Daily Bonus</p>
-          <p className="text-sm font-bold text-zinc-900 truncate">{site.dailyBonus || site.wheelBonus}</p>
-        </div>
-        <div className="p-2.5 bg-zinc-50 rounded-2xl border border-zinc-100">
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Min Payout</p>
-          <div className="flex flex-col gap-0.5">
-            <p className="text-[10px] font-medium text-zinc-600">SC: ${site.minPayoutSC}</p>
-            <p className="text-[10px] font-medium text-zinc-600">Gift: ${site.minPayoutGiftCard}</p>
-            <p className="text-[10px] font-medium text-zinc-600">Crypto: ${site.minPayoutCrypto}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-[10px] text-zinc-400 font-mono truncate max-w-[120px]">
+              {site.url.replace('https://', '')}
+            </p>
+            <span className={cn(
+              "px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-tighter",
+              site.resetStyle === 'fixed' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+            )}>
+              {site.resetStyle || 'rolling'}
+            </span>
           </div>
         </div>
+        <div className="flex flex-col items-end">
+          <button 
+            onClick={() => onEdit(site)}
+            className="p-1.5 text-zinc-300 hover:text-zinc-500 hover:bg-zinc-100 rounded-lg transition-all"
+          >
+            <Settings size={14} />
+          </button>
+        </div>
       </div>
 
-      <div className="mb-4 p-2.5 bg-indigo-50/30 rounded-2xl border border-indigo-100/50">
-        <div className="flex items-center justify-between">
-          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Payout Speed</p>
-          <p className="text-[10px] font-bold text-indigo-600">{getPayoutSpeedLabel(site.payoutSpeedRank)}</p>
+      {/* Progress Bar */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1.5">
+            <Trophy size={12} className={isNearCashout ? "text-amber-500" : "text-zinc-400"} />
+            <span className="text-[10px] font-black uppercase text-zinc-400 tracking-widest">Progress to ${minPayout}</span>
+          </div>
+          <span className={cn("text-[10px] font-black", isNearCashout ? "text-amber-600" : "text-zinc-600")}>
+            {progressPercent.toFixed(0)}%
+          </span>
         </div>
-        <div className="mt-1.5 h-1.5 w-full bg-indigo-100 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-indigo-600 transition-all duration-500" 
-            style={{ width: `${Math.max(10, (6 - site.payoutSpeedRank) * 20)}%` }}
+        <div className="h-2 w-full bg-zinc-100 rounded-full overflow-hidden border border-zinc-200/50">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${progressPercent}%` }}
+            className={cn(
+              "h-full transition-all duration-1000",
+              isNearCashout ? "bg-gradient-to-r from-amber-400 to-amber-600" : "bg-indigo-600"
+            )}
           />
         </div>
       </div>
 
-      {site.payoutMethods && site.payoutMethods.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-1">
-          {site.payoutMethods.map(method => (
-            <span key={method} className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[9px] font-bold rounded-md uppercase">
-              {method}
-            </span>
-          ))}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="p-3 bg-zinc-50/50 rounded-2xl border border-zinc-100 group-hover:bg-white transition-colors">
+          <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Daily Bonus</p>
+          <div className="flex items-center gap-1.5">
+            <Coins size={12} className="text-amber-500" />
+            <p className="text-xs font-black text-zinc-900">{site.dailyBonus || site.wheelBonus}</p>
+          </div>
         </div>
-      )}
+        <div className="p-3 bg-zinc-50/50 rounded-2xl border border-zinc-100 group-hover:bg-white transition-colors">
+          <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Balance</p>
+          {isEditingBalance ? (
+            <form onSubmit={handleBalanceSubmit} className="flex items-center gap-1">
+              <input 
+                autoFocus
+                type="number"
+                step="0.01"
+                value={tempBalance}
+                onChange={e => setTempBalance(e.target.value)}
+                onBlur={handleBalanceSubmit}
+                className="w-full bg-white border border-indigo-200 rounded px-1 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </form>
+          ) : (
+            <button 
+              onClick={() => setIsEditingBalance(true)}
+              className="flex items-center gap-1.5 w-full text-left group/balance"
+            >
+              <p className="text-xs font-black text-zinc-900">${currentBalance.toFixed(2)}</p>
+              <Settings size={10} className="text-zinc-300 opacity-0 group-hover/balance:opacity-100 transition-opacity" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        <span className={cn(
+          "px-2 py-0.5 text-[9px] font-black rounded-lg uppercase tracking-wider border",
+          site.isWheelBonus ? "bg-purple-50 text-purple-700 border-purple-100" : "bg-blue-50 text-blue-700 border-blue-100"
+        )}>
+          {site.isWheelBonus ? "Wheel Spin" : "Static Claim"}
+        </span>
+        {site.payoutMethods?.slice(0, 2).map(method => (
+          <span key={method} className="px-2 py-0.5 bg-zinc-100 text-zinc-600 text-[9px] font-black rounded-lg uppercase tracking-wider border border-zinc-200">
+            {method}
+          </span>
+        ))}
+      </div>
 
       <div className="mt-auto flex items-center justify-between gap-3">
-        <button
-          onClick={() => setIsAnalysisOpen(true)}
-          className="p-2.5 rounded-xl bg-zinc-50 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
-          title="Analyze T&C"
-        >
-          <Search size={18} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setIsAnalysisOpen(true)}
+            className="p-2.5 rounded-xl bg-zinc-50 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all border border-zinc-100"
+            title="Analyze T&C"
+          >
+            <Search size={18} />
+          </button>
+          <button 
+            onClick={() => onAutoFill(site)}
+            className="p-2.5 rounded-xl bg-zinc-50 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 transition-all border border-zinc-100"
+            title="AI Auto-fill"
+          >
+            <Zap size={18} />
+          </button>
+        </div>
 
         <button
           onClick={() => {
             onVisit(site.id);
             window.open(site.url, '_blank');
           }}
-          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm active:scale-[0.98]"
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]",
+            bonusStatus === 'ready' ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200" : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200 shadow-none"
+          )}
         >
           <ExternalLink size={16} />
-          Launch
-        </button>
-        
-        <button
-          onClick={() => onCollect(site.id)}
-          disabled={isCollectedToday}
-          className={cn(
-            "flex items-center justify-center p-2.5 rounded-xl transition-all duration-300",
-            isCollectedToday 
-              ? "bg-emerald-100 text-emerald-600 cursor-default" 
-              : "bg-zinc-100 text-zinc-400 hover:bg-emerald-100 hover:text-emerald-600"
-          )}
-          title={isCollectedToday ? "Collected for today" : "Mark as collected"}
-        >
-          <CheckCircle2 size={20} />
+          {bonusStatus === 'ready' ? 'Claim Now' : statusLabels[bonusStatus]}
         </button>
       </div>
 
@@ -1132,7 +1204,7 @@ function App() {
   const [userProgress, setUserProgress] = useState<Record<string, UserProgress>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'payout' | 'min' | 'last' | 'method' | 'welcome' | 'daily' | 'minGC' | 'minCrypto' | 'due'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'payout' | 'min' | 'last' | 'method' | 'welcome' | 'daily' | 'minGC' | 'minCrypto' | 'due' | 'value' | 'progress'>('name');
   const [filter, setFilter] = useState<'all' | 'active' | 'signup'>('all');
   const [selectedMethod, setSelectedMethod] = useState<string>('all');
   const [isLaunchMode, setIsLaunchMode] = useState(false);
@@ -1150,6 +1222,7 @@ function App() {
   const [minSC, setMinSC] = useState<number>(0);
   const [minGift, setMinGift] = useState<number>(0);
   const [minCrypto, setMinCrypto] = useState<number>(0);
+  const [payoutFilterMode, setPayoutFilterMode] = useState<'sc' | 'gift' | 'crypto'>('sc');
   const scanIdRef = useRef(0);
 
   const ai = useMemo(() => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }), []);
@@ -1623,6 +1696,70 @@ function App() {
     return Array.from(methods).sort();
   }, [sites]);
 
+  const calculateValueScore = (site: SweepstakeSite) => {
+    const bonusStr = site.dailyBonus || site.wheelBonus || '0';
+    const bonusVal = parseFloat(bonusStr.replace(/[^0-9.]/g, '')) || 0.1; // Default small value if not parseable
+    const minPayout = site.minPayoutSC || 100;
+    const speed = site.payoutSpeedRank || 3;
+    // Higher bonus, lower min payout, faster speed (lower rank) = higher score
+    // Score = (Bonus / MinPayout) * (6 - SpeedRank)
+    return (bonusVal / minPayout) * (6 - speed) * 100;
+  };
+
+  const getBonusStatus = (site: SweepstakeSite) => {
+    const progress = userProgress[site.id];
+    if (!progress?.lastCollectedAt) return 'ready';
+    
+    const last = progress.lastCollectedAt.toDate();
+    const now = new Date();
+    
+    if (site.resetStyle === 'fixed' && site.resetTimeEST) {
+      // Fixed reset time (e.g. 00:00 EST)
+      // For simplicity, we'll just check if last collection was before the most recent reset time
+      const [hours, minutes] = site.resetTimeEST.split(':').map(Number);
+      const lastReset = new Date(now);
+      lastReset.setUTCHours(hours + 5, minutes, 0, 0); // EST is UTC-5
+      if (now < lastReset) {
+        lastReset.setUTCDate(lastReset.getUTCDate() - 1);
+      }
+      return last < lastReset ? 'ready' : 'collected';
+    } else {
+      // Rolling 24h timer
+      const diff = now.getTime() - last.getTime();
+      const twoHours = 2 * 60 * 60 * 1000;
+      const twentyFourHours = 24 * 60 * 60 * 1000;
+      
+      if (diff >= twentyFourHours) return 'ready';
+      if (diff >= twentyFourHours - twoHours) return 'soon';
+      return 'collected';
+    }
+  };
+
+  const handleMorningRoutine = () => {
+    // Open top 5 reliable sites (Stake, Chumba, Pulsz, etc.)
+    const reliable = ['Stake.us', 'Chumba', 'Pulsz Casino', 'McLuck', 'Fortune Coins'];
+    const routineSites = sites.filter(s => reliable.some(r => s.name.includes(r))).slice(0, 5);
+    
+    if (routineSites.length === 0) {
+      setNotification("No routine sites found. Add them to your list first!");
+      return;
+    }
+    
+    routineSites.forEach(s => window.open(s.url, '_blank'));
+    setNotification(`Launched ${routineSites.length} routine sites!`);
+  };
+
+  const handleUpdateBalance = async (siteId: string, balance: number) => {
+    if (!user) return;
+    const path = `users/${user.uid}/progress/${siteId}`;
+    const progressRef = doc(db, `users/${user.uid}/progress`, siteId);
+    try {
+      await updateDoc(progressRef, { currentBalance: balance });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  };
+
   const filteredSites = useMemo(() => {
     let result = sites.filter(s => 
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1672,6 +1809,14 @@ function App() {
         const lastB = userProgress[b.id]?.lastCollectedAt?.toMillis() || 0;
         return lastA - lastB;
       }
+      if (sortBy === 'value') {
+        return calculateValueScore(b) - calculateValueScore(a);
+      }
+      if (sortBy === 'progress') {
+        const progA = ((userProgress[a.id]?.currentBalance || 0) / (a.minPayoutSC || 100));
+        const progB = ((userProgress[b.id]?.currentBalance || 0) / (b.minPayoutSC || 100));
+        return progB - progA;
+      }
       return 0;
     });
   }, [sites, searchTerm, sortBy, filter, userProgress, selectedMethod, minSC, minGift, minCrypto]);
@@ -1693,6 +1838,15 @@ function App() {
     }, 0);
 
     return { total, collectedToday, totalDailyPotential };
+  }, [sites, userProgress]);
+
+  const nearCashoutSites = useMemo(() => {
+    return sites.filter(s => {
+      const progress = userProgress[s.id];
+      if (!progress?.currentBalance) return false;
+      const minPayout = s.minPayoutSC || 100;
+      return (progress.currentBalance / minPayout) >= 0.9;
+    });
   }, [sites, userProgress]);
 
   if (loading) {
@@ -1744,6 +1898,14 @@ function App() {
           </div>
 
           <div className="flex items-center gap-4">
+            <button
+              onClick={handleMorningRoutine}
+              className="flex items-center gap-2 py-2 px-4 bg-amber-50 text-amber-600 rounded-xl font-bold text-sm hover:bg-amber-100 transition-all"
+              title="Open top 5 reliable sites"
+            >
+              <Zap size={16} />
+              Morning Routine
+            </button>
             <button
               onClick={() => {
                 setEditingSite(undefined);
@@ -1863,6 +2025,8 @@ function App() {
                   className="px-2 py-2 bg-transparent text-xs font-bold uppercase tracking-wider outline-none text-zinc-600 cursor-pointer"
                 >
                   <option value="name">Name</option>
+                  <option value="value">Value Score</option>
+                  <option value="progress">Cashout Progress</option>
                   <option value="welcome">Welcome Bonus</option>
                   <option value="daily">Daily Bonus</option>
                   <option value="payout">Redemption Speed</option>
@@ -2109,6 +2273,39 @@ function App() {
           ) : null}
         </AnimatePresence>
 
+        {/* Near Cashout Alerts */}
+        {nearCashoutSites.length > 0 && (
+          <div className="mb-8 p-6 bg-amber-50 border border-amber-100 rounded-3xl shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-200">
+                <Trophy size={20} />
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-amber-900">Near Cashout Threshold</h2>
+                <p className="text-xs text-amber-700">You're at 90%+ of the minimum payout for these sites!</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {nearCashoutSites.map(site => (
+                <div key={site.id} className="bg-white p-4 rounded-2xl border border-amber-200 flex items-center justify-between shadow-sm">
+                  <div>
+                    <p className="text-sm font-black text-zinc-900">{site.name}</p>
+                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">
+                      ${userProgress[site.id]?.currentBalance?.toFixed(2)} / ${site.minPayoutSC}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => window.open(site.url, '_blank')}
+                    className="p-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-all shadow-md"
+                  >
+                    <ExternalLink size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Grid */}
         {sites.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-zinc-200">
@@ -2143,12 +2340,53 @@ function App() {
                     setVaultSite(s);
                     setIsVaultModalOpen(true);
                   }}
+                  onUpdateBalance={handleUpdateBalance}
+                  getBonusStatus={getBonusStatus}
                   isLaunchMode={isLaunchMode}
                 />
               ))}
             </AnimatePresence>
           </div>
         )}
+
+        {/* Tips & Safety Section */}
+        <div className="mt-16 p-8 bg-zinc-900 rounded-[40px] text-white overflow-hidden relative">
+          <div className="absolute top-0 right-0 p-12 opacity-10">
+            <Shield size={200} />
+          </div>
+          <div className="relative z-10">
+            <h2 className="text-3xl font-black mb-6">Pro Tips & Safety</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="space-y-3">
+                <div className="w-10 h-10 bg-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center">
+                  <ShieldCheck size={20} />
+                </div>
+                <h3 className="text-lg font-bold">Anti-Fingerprinting</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Avoid using VPNs or data center proxies. Most sites use advanced fingerprinting and will shadow-ban accounts that access from rotating IP addresses.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <div className="w-10 h-10 bg-emerald-500/20 text-emerald-400 rounded-xl flex items-center justify-center">
+                  <Clock size={20} />
+                </div>
+                <h3 className="text-lg font-bold">Reset Awareness</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Watch the "Reset Style" tag. Fixed reset sites (like Stake) are easier to track, but rolling 24h sites require you to claim at the same time every day to maximize value.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <div className="w-10 h-10 bg-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center">
+                  <Lock size={20} />
+                </div>
+                <h3 className="text-lg font-bold">Zero-Knowledge Vault</h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Your Master Password is never stored on our servers. It exists only in your browser's memory. If you forget it, your credentials cannot be recovered.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
 
       <SiteModal 

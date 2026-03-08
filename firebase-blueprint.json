@@ -18,7 +18,9 @@
         "signupDate": { "type": "string", "description": "Date of sign up and profile creation." },
         "lastCollectedAt": { "type": "string", "format": "date-time", "description": "The last time the daily bonus was collected." },
         "isWheelBonus": { "type": "boolean", "description": "Whether the site has a wheel spin bonus." },
-        "payoutSpeedRank": { "type": "number", "description": "Numeric rank for payout speed (lower is faster)." }
+        "payoutSpeedRank": { "type": "number", "description": "Numeric rank for payout speed (lower is faster)." },
+        "resetStyle": { "type": "string", "enum": ["fixed", "rolling"], "description": "Whether the site resets at a fixed time or on a rolling timer." },
+        "resetTimeEST": { "type": "string", "description": "The fixed reset time in EST (e.g., '00:00')." }
       },
       "required": ["name", "url"]
     },
@@ -33,7 +35,8 @@
         "visitCount": { "type": "number", "description": "Number of times the site has been visited." },
         "hasAccount": { "type": "boolean", "description": "Whether the user has an active profile on this site." },
         "encryptedUsername": { "type": "string", "description": "AES encrypted username." },
-        "encryptedPassword": { "type": "string", "description": "AES encrypted password." }
+        "encryptedPassword": { "type": "string", "description": "AES encrypted password." },
+        "currentBalance": { "type": "number", "description": "The user's current balance on this site." }
       },
       "required": ["userId", "siteId"]
     }
