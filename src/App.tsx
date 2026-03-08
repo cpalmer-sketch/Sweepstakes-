@@ -44,12 +44,18 @@ import {
   Bell,
   Download,
   Upload,
-  X
+  X,
+  Lock,
+  Unlock,
+  Eye,
+  EyeOff,
+  Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { GoogleGenAI } from "@google/genai";
+import CryptoJS from 'crypto-js';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -178,6 +184,8 @@ interface UserProgress {
   lastCollectedAt: Timestamp | null;
   visitCount: number;
   hasAccount: boolean;
+  encryptedUsername?: string;
+  encryptedPassword?: string;
 }
 
 // --- Initial Data (80+ sites) ---
@@ -701,6 +709,176 @@ const SiteModal = ({
   );
 };
 
+const VaultModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  site,
+  progress,
+  masterKey,
+  onSetMasterKey
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (id: string, username?: string, password?: string) => void;
+  site: SweepstakeSite | null;
+  progress?: UserProgress;
+  masterKey: string | null;
+  onSetMasterKey: (key: string) => void;
+}) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [tempKey, setTempKey] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && masterKey && progress && site) {
+      try {
+        const decryptedUser = progress.encryptedUsername 
+          ? CryptoJS.AES.decrypt(progress.encryptedUsername, masterKey).toString(CryptoJS.enc.Utf8)
+          : '';
+        const decryptedPass = progress.encryptedPassword
+          ? CryptoJS.AES.decrypt(progress.encryptedPassword, masterKey).toString(CryptoJS.enc.Utf8)
+          : '';
+        setUsername(decryptedUser);
+        setPassword(decryptedPass);
+        setIsUnlocked(true);
+      } catch (e) {
+        setIsUnlocked(false);
+      }
+    } else {
+      setUsername('');
+      setPassword('');
+      setIsUnlocked(!!masterKey);
+    }
+  }, [isOpen, masterKey, progress, site]);
+
+  const handleUnlock = () => {
+    if (tempKey) {
+      onSetMasterKey(tempKey);
+      setTempKey('');
+    }
+  };
+
+  const handleSave = () => {
+    if (site && masterKey) {
+      onSave(site.id, username, password);
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+      >
+        <div className="p-6 border-b border-zinc-100 flex items-center justify-between bg-zinc-50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl">
+              <Shield size={20} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-zinc-900">Secure Vault</h2>
+              <p className="text-xs text-zinc-500 mt-1">{site?.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white rounded-xl transition-colors">
+            <X size={20} className="text-zinc-400" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {!masterKey ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl text-amber-800 text-xs">
+                <p className="font-bold mb-1 flex items-center gap-2">
+                  <Lock size={14} /> Master Password Required
+                </p>
+                <p>This password is never stored and is required to encrypt/decrypt your credentials. If you forget it, your stored credentials cannot be recovered.</p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase text-zinc-400">Enter Master Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={tempKey}
+                    onChange={(e) => setTempKey(e.target.value)}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 transition-all"
+                    placeholder="••••••••"
+                  />
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={handleUnlock}
+                disabled={!tempKey}
+                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all shadow-lg"
+              >
+                Unlock Vault
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase text-zinc-400">Username / Email</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 transition-all"
+                  placeholder="Username"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold uppercase text-zinc-400">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-600 transition-all"
+                    placeholder="Password"
+                  />
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={onClose}
+                  className="flex-1 py-4 bg-zinc-100 text-zinc-600 rounded-2xl font-bold hover:bg-zinc-200 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg"
+                >
+                  Save Encrypted
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 interface SiteCardProps {
   key?: string | number;
   site: SweepstakeSite;
@@ -710,6 +888,7 @@ interface SiteCardProps {
   onEdit: (site: SweepstakeSite) => void;
   onAutoFill: (site: SweepstakeSite) => void;
   onToggleAccount: (id: string, current: boolean) => void;
+  onOpenVault: (site: SweepstakeSite) => void;
   isLaunchMode?: boolean;
 }
 
@@ -732,6 +911,7 @@ const SiteCard = ({
   onEdit,
   onAutoFill,
   onToggleAccount,
+  onOpenVault,
   isLaunchMode = false 
 }: SiteCardProps) => {
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
@@ -791,6 +971,16 @@ const SiteCard = ({
                 title="Edit Site"
               >
                 <Settings size={14} />
+              </button>
+              <button 
+                onClick={() => onOpenVault(site)}
+                className={cn(
+                  "p-1 transition-colors",
+                  progress?.encryptedUsername ? "text-indigo-600" : "text-zinc-300 hover:text-indigo-400"
+                )}
+                title="Secure Vault"
+              >
+                <Lock size={14} />
               </button>
             </div>
           </div>
@@ -949,6 +1139,9 @@ function App() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [batchSize, setBatchSize] = useState(10);
   const [autoLaunchNext, setAutoLaunchNext] = useState(true);
+  const [isVaultModalOpen, setIsVaultModalOpen] = useState(false);
+  const [vaultSite, setVaultSite] = useState<SweepstakeSite | null>(null);
+  const [masterKey, setMasterKey] = useState<string | null>(null);
   const [isSiteModalOpen, setIsSiteModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<SweepstakeSite | undefined>();
@@ -1393,6 +1586,37 @@ function App() {
     }
   };
 
+  const handleSaveVault = async (siteId: string, username?: string, password?: string) => {
+    if (!user || !masterKey) return;
+    const path = `users/${user.uid}/progress/${siteId}`;
+    const progressRef = doc(db, `users/${user.uid}/progress`, siteId);
+    
+    try {
+      const encryptedUsername = username ? CryptoJS.AES.encrypt(username, masterKey).toString() : '';
+      const encryptedPassword = password ? CryptoJS.AES.encrypt(password, masterKey).toString() : '';
+      
+      const existing = userProgress[siteId];
+      if (existing) {
+        await updateDoc(progressRef, {
+          encryptedUsername,
+          encryptedPassword
+        });
+      } else {
+        await setDoc(progressRef, {
+          siteId,
+          visitCount: 0,
+          hasAccount: true,
+          lastCollectedAt: null,
+          encryptedUsername,
+          encryptedPassword
+        });
+      }
+      setNotification(`Credentials secured for ${sites.find(s => s.id === siteId)?.name}`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  };
+
   const allMethods = useMemo(() => {
     const methods = new Set<string>();
     sites.forEach(s => s.payoutMethods?.forEach(m => methods.add(m)));
@@ -1546,6 +1770,16 @@ function App() {
               <Upload size={16} />
               Import
             </button>
+            {masterKey && (
+              <button
+                onClick={() => setMasterKey(null)}
+                className="flex items-center gap-2 py-2 px-4 bg-red-50 text-red-600 rounded-xl font-bold text-sm hover:bg-red-100 transition-all"
+                title="Lock Vault (Clear Session)"
+              >
+                <Lock size={16} />
+                Lock Vault
+              </button>
+            )}
               <div className="hidden md:flex items-center gap-6 mr-6">
                 <div className="text-right">
                   <p className="text-[10px] text-zinc-400 font-bold uppercase">Daily Potential</p>
@@ -1905,6 +2139,10 @@ function App() {
                   }}
                   onAutoFill={handleAutoFill}
                   onToggleAccount={handleToggleAccount}
+                  onOpenVault={(s) => {
+                    setVaultSite(s);
+                    setIsVaultModalOpen(true);
+                  }}
                   isLaunchMode={isLaunchMode}
                 />
               ))}
@@ -1918,6 +2156,16 @@ function App() {
         onClose={() => setIsSiteModalOpen(false)}
         onSave={handleSaveSite}
         site={editingSite}
+      />
+
+      <VaultModal
+        isOpen={isVaultModalOpen}
+        onClose={() => setIsVaultModalOpen(false)}
+        onSave={handleSaveVault}
+        site={vaultSite}
+        progress={vaultSite ? userProgress[vaultSite.id] : undefined}
+        masterKey={masterKey}
+        onSetMasterKey={setMasterKey}
       />
 
       <BulkImportModal
