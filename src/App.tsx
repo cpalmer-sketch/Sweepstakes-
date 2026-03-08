@@ -968,6 +968,7 @@ const SiteCard = ({
       exit={{ opacity: 0, scale: 0.95 }}
       className={cn(
         "group relative flex flex-col p-5 rounded-3xl border transition-all duration-300",
+        progress?.isFavorite ? "ring-2 ring-amber-400 shadow-md shadow-amber-100" : "",
         isNearCashout ? "border-amber-400 bg-amber-50/30 ring-4 ring-amber-100/50" : 
         bonusStatus === 'ready' ? "bg-emerald-50/30 border-emerald-100" : "bg-white border-zinc-100 shadow-sm hover:shadow-md hover:border-zinc-200"
       )}
@@ -985,7 +986,8 @@ const SiteCard = ({
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-lg font-black text-zinc-900 group-hover:text-indigo-600 transition-colors leading-tight">
+            <h3 className="text-lg font-black text-zinc-900 group-hover:text-indigo-600 transition-colors leading-tight flex items-center gap-2">
+              {progress?.isFavorite && <Star size={16} className="text-amber-500" fill="currentColor" />}
               {site.name}
             </h3>
             <div className="flex items-center gap-1">
@@ -1102,20 +1104,6 @@ const SiteCard = ({
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-1.5">
-        <span className={cn(
-          "px-2 py-0.5 text-[9px] font-black rounded-lg uppercase tracking-wider border",
-          site.isWheelBonus ? "bg-purple-50 text-purple-700 border-purple-100" : "bg-blue-50 text-blue-700 border-blue-100"
-        )}>
-          {site.isWheelBonus ? "Wheel Spin" : "Static Claim"}
-        </span>
-        {site.payoutMethods?.slice(0, 2).map(method => (
-          <span key={method} className="px-2 py-0.5 bg-zinc-100 text-zinc-600 text-[9px] font-black rounded-lg uppercase tracking-wider border border-zinc-200">
-            {method}
-          </span>
-        ))}
-      </div>
-
       <div className="mt-auto flex items-center justify-between gap-3">
         <div className="flex items-center gap-1">
           <button
@@ -1134,19 +1122,41 @@ const SiteCard = ({
           </button>
         </div>
 
-        <button
-          onClick={() => {
-            onVisit(site.id);
-            window.open(site.url, '_blank');
-          }}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]",
-            bonusStatus === 'ready' ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200" : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200 shadow-none"
-          )}
-        >
-          <ExternalLink size={16} />
-          {bonusStatus === 'ready' ? 'Claim Now' : statusLabels[bonusStatus]}
-        </button>
+        {isLaunchMode ? (
+          <button
+            onClick={() => onCollect(site.id)}
+            className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200 active:scale-[0.98]"
+          >
+            <CheckCircle2 size={18} />
+            Visited & Next
+          </button>
+        ) : (
+          <div className="flex-1 flex gap-2">
+            <button
+              onClick={() => {
+                onVisit(site.id);
+                window.open(site.url, '_blank');
+              }}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]",
+                bonusStatus === 'ready' ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200" : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200 shadow-none"
+              )}
+            >
+              <ExternalLink size={16} />
+              Visit
+            </button>
+            <button
+              onClick={() => onCollect(site.id)}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-[0.98]",
+                bonusStatus === 'ready' ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200" : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200 shadow-none"
+              )}
+            >
+              <CheckCircle2 size={16} />
+              Visited
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mt-4 pt-3 border-t border-zinc-50 flex items-center justify-between">
