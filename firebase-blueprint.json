@@ -30,7 +30,8 @@
         "userId": { "type": "string", "description": "The ID of the user." },
         "siteId": { "type": "string", "description": "The ID of the sweepstakes site." },
         "lastCollectedAt": { "type": "string", "format": "date-time", "description": "The last time the daily bonus was collected." },
-        "visitCount": { "type": "number", "description": "Number of times the site has been visited." }
+        "visitCount": { "type": "number", "description": "Number of times the site has been visited." },
+        "hasAccount": { "type": "boolean", "description": "Whether the user has an active profile on this site." }
       },
       "required": ["userId", "siteId"]
     }

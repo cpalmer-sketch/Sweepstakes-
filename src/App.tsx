@@ -177,6 +177,7 @@ interface UserProgress {
   siteId: string;
   lastCollectedAt: Timestamp | null;
   visitCount: number;
+  hasAccount: boolean;
 }
 
 // --- Initial Data (80+ sites) ---
@@ -264,6 +265,75 @@ const INITIAL_SITES_DATA: Partial<SweepstakeSite>[] = [
   { name: "WOW Vegas", url: "https://wowvegas.com", welcomeBonus: "5 SC + 250k GC", dailyBonus: "0.30 SC", wheelBonus: "Daily Login (Streak-based)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
   { name: "Yay Casino", url: "https://yaycasino.com", welcomeBonus: "5 SC + 50k GC", dailyBonus: "1 SC (Progressive)", wheelBonus: "Daily", minPayoutSC: 50, processTime: "< 24 Hours", payoutSpeedRank: 2 },
   { name: "Zula Casino", url: "https://zulacasino.com", welcomeBonus: "10 SC + 100k GC", dailyBonus: "1 SC", wheelBonus: "-", minPayoutSC: 50, processTime: "24 Hours", payoutSpeedRank: 2 },
+  { name: "Scrooge Casino", url: "https://scroogecasino.com", welcomeBonus: "2 SC + 250k GC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Sweeptastic", url: "https://sweeptastic.com", welcomeBonus: "2 SC + 10k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "BitBetWin", url: "https://bitbetwin.cc", welcomeBonus: "5 SC + 5k GC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Orion Stars", url: "https://orionstars.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Milky Way", url: "https://milkyway.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Fire Kirin", url: "https://firekirin.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "GameVault", url: "https://gamevault.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Juwa", url: "https://juwa.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Panda Master", url: "https://pandamaster.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Ultra Monster", url: "https://ultramonster.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Vegas Sweeps", url: "https://vegassweeps.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Golden Dragon", url: "https://goldendragon.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Blue Dragon", url: "https://bluedragon.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "River Monster", url: "https://rivermonster.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Skillmine", url: "https://skillmine.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Vegas-X", url: "https://vegas-x.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Fire777", url: "https://fire777.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Paradise Casino", url: "https://paradisecasino.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Galaxy Fortune", url: "https://galaxyfortune.com", welcomeBonus: "1 SC + 1k GC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Brango Casino", url: "https://brango.com", welcomeBonus: "100 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Extreme Casino", url: "https://extreme.com", welcomeBonus: "100 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Yabby Casino", url: "https://yabby.com", welcomeBonus: "100 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Adrenaline Casino", url: "https://adrenaline.com", welcomeBonus: "100 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Limitless Casino", url: "https://limitless.com", welcomeBonus: "100 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 50, processTime: "Instant", payoutSpeedRank: 1 },
+  { name: "Slots Capital", url: "https://slotscapital.com", welcomeBonus: "10 SC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Desert Night", url: "https://desertnight.com", welcomeBonus: "10 SC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Red Stag", url: "https://redstag.com", welcomeBonus: "10 SC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Miami Club", url: "https://miamiclub.com", welcomeBonus: "10 SC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Liberty Slots", url: "https://libertyslots.com", welcomeBonus: "10 SC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Lincoln Casino", url: "https://lincolncasino.com", welcomeBonus: "10 SC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Sloto Cash", url: "https://slotocash.com", welcomeBonus: "10 SC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Uptown Aces", url: "https://uptownaces.com", welcomeBonus: "10 SC", dailyBonus: "0.50 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Spartan Slots", url: "https://spartanslots.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Black Diamond", url: "https://blackdiamond.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Box 24", url: "https://box24.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "7 Reels", url: "https://7reels.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Rich Casino", url: "https://richcasino.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Thebes Casino", url: "https://thebescasino.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Winward Casino", url: "https://winwardcasino.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "21 Dukes", url: "https://21dukes.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Casino Moons", url: "https://casinomoons.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Slots Village", url: "https://slotsvillage.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "7Spins", url: "https://7spins.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Bondibet", url: "https://bondibet.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Tangiers", url: "https://tangiers.com", welcomeBonus: "25 Free Spins", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Stellar Spins", url: "https://stellarspins.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Wolf Winner", url: "https://wolfwinner.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Wild Card City", url: "https://wildcardcity.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "King Johnnie", url: "https://kingjohnnie.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Ruby Fortune", url: "https://rubyfortune.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Spin Palace", url: "https://spinpalace.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Jackpot City", url: "https://jackpotcity.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Royal Vegas", url: "https://royalvegas.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Euro Palace", url: "https://europalace.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "All Slots", url: "https://allslots.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Platinum Play", url: "https://platinumplay.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Gaming Club", url: "https://gamingclub.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Lucky Nugget", url: "https://luckynugget.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "River Belle", url: "https://riverbelle.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Mummys Gold", url: "https://mummysgold.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Cabaret Club", url: "https://cabaretclub.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Magic Red", url: "https://magicred.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Mr Play", url: "https://mrplay.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Regent Play", url: "https://regentplay.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Queen Play", url: "https://queenplay.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Plaza Royal", url: "https://plazaroyal.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Luckster", url: "https://luckster.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "ZetBet", url: "https://zetbet.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
+  { name: "Spin Rio", url: "https://spinrio.com", welcomeBonus: "10 SC", dailyBonus: "1 SC", wheelBonus: "Daily Login (24h)", minPayoutSC: 100, processTime: "1-3 Days", payoutSpeedRank: 3 },
 ];
 
 // --- Components ---
@@ -639,8 +709,20 @@ interface SiteCardProps {
   onVisit: (id: string) => void;
   onEdit: (site: SweepstakeSite) => void;
   onAutoFill: (site: SweepstakeSite) => void;
+  onToggleAccount: (id: string, current: boolean) => void;
   isLaunchMode?: boolean;
 }
+
+const getPayoutSpeedLabel = (rank: number) => {
+  switch (rank) {
+    case 1: return 'Instant';
+    case 2: return '< 24 Hours';
+    case 3: return '1-3 Days';
+    case 4: return '3-5 Days';
+    case 5: return '5+ Days';
+    default: return 'Unknown';
+  }
+};
 
 const SiteCard = ({ 
   site, 
@@ -649,6 +731,7 @@ const SiteCard = ({
   onVisit,
   onEdit,
   onAutoFill,
+  onToggleAccount,
   isLaunchMode = false 
 }: SiteCardProps) => {
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false);
@@ -684,6 +767,18 @@ const SiteCard = ({
             </h3>
             <div className="flex items-center gap-1">
               <button 
+                onClick={() => onToggleAccount(site.id, !!progress?.hasAccount)}
+                className={cn(
+                  "px-2 py-0.5 rounded-md text-[9px] font-bold uppercase transition-all",
+                  progress?.hasAccount 
+                    ? "bg-emerald-100 text-emerald-700 border border-emerald-200" 
+                    : "bg-zinc-100 text-zinc-500 border border-zinc-200"
+                )}
+                title={progress?.hasAccount ? "Active Profile" : "Need Signup"}
+              >
+                {progress?.hasAccount ? "Active" : "Signup"}
+              </button>
+              <button 
                 onClick={() => onAutoFill(site)}
                 className="p-1 text-zinc-300 hover:text-indigo-600 transition-colors"
                 title="AI Auto-fill missing info"
@@ -703,18 +798,6 @@ const SiteCard = ({
             {site.url.replace('https://', '')}
           </p>
         </div>
-        <div className="flex gap-2">
-          {site.isWheelBonus && (
-            <span className="px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-              <TrendingUp size={10} /> Wheel
-            </span>
-          )}
-          {site.payoutSpeedRank === 1 && (
-            <span className="px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-              <Zap size={10} /> Instant
-            </span>
-          )}
-        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
@@ -729,6 +812,19 @@ const SiteCard = ({
             <p className="text-[10px] font-medium text-zinc-600">Gift: ${site.minPayoutGiftCard}</p>
             <p className="text-[10px] font-medium text-zinc-600">Crypto: ${site.minPayoutCrypto}</p>
           </div>
+        </div>
+      </div>
+
+      <div className="mb-4 p-2.5 bg-indigo-50/30 rounded-2xl border border-indigo-100/50">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Payout Speed</p>
+          <p className="text-[10px] font-bold text-indigo-600">{getPayoutSpeedLabel(site.payoutSpeedRank)}</p>
+        </div>
+        <div className="mt-1.5 h-1.5 w-full bg-indigo-100 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-indigo-600 transition-all duration-500" 
+            style={{ width: `${Math.max(10, (6 - site.payoutSpeedRank) * 20)}%` }}
+          />
         </div>
       </div>
 
@@ -846,12 +942,13 @@ function App() {
   const [userProgress, setUserProgress] = useState<Record<string, UserProgress>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'payout' | 'min' | 'last' | 'method'>('name');
-  const [filter, setFilter] = useState<'all' | 'wheel' | 'instant'>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'payout' | 'min' | 'last' | 'method' | 'welcome' | 'daily' | 'minGC' | 'minCrypto' | 'due'>('name');
+  const [filter, setFilter] = useState<'all' | 'active' | 'signup'>('all');
   const [selectedMethod, setSelectedMethod] = useState<string>('all');
   const [isLaunchMode, setIsLaunchMode] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [batchSize, setBatchSize] = useState(10);
+  const [autoLaunchNext, setAutoLaunchNext] = useState(true);
   const [isSiteModalOpen, setIsSiteModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingSite, setEditingSite] = useState<SweepstakeSite | undefined>();
@@ -1132,9 +1229,12 @@ function App() {
     // Use a small timeout to avoid some browser blocks, though still risky
     filteredSites.slice(start, end).forEach((site, index) => {
       setTimeout(() => {
-        window.open(site.url, '_blank');
+        const win = window.open(site.url, '_blank');
+        if (!win) {
+          console.error(`Popup blocked for ${site.name}`);
+        }
         handleVisit(site.id);
-      }, index * 300);
+      }, index * 500); // Increased delay to help with some blockers
     });
     
     setCurrentIndex(Math.min(end, filteredSites.length - 1));
@@ -1200,7 +1300,7 @@ function App() {
         });
       });
       await batch.commit();
-      setNotification("Database seeded with 80+ sites!");
+      setNotification(`Database seeded with ${INITIAL_SITES_DATA.length} sites!`);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
@@ -1230,10 +1330,17 @@ function App() {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
 
-    if (isLaunchMode && currentIndex < filteredSites.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-      const nextSite = filteredSites[currentIndex + 1];
-      window.open(nextSite.url, '_blank');
+    if (isLaunchMode) {
+      const nextIndex = currentIndex + 1;
+      if (nextIndex < filteredSites.length) {
+        setCurrentIndex(nextIndex);
+        if (autoLaunchNext) {
+          window.open(filteredSites[nextIndex].url, '_blank');
+        }
+      } else {
+        setIsLaunchMode(false);
+        setNotification("Launch sequence complete!");
+      }
     }
   };
 
@@ -1252,9 +1359,35 @@ function App() {
         await setDoc(progressRef, {
           siteId,
           lastCollectedAt: null,
-          visitCount: 1
+          visitCount: 1,
+          hasAccount: false
         });
       }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, path);
+    }
+  };
+
+  const handleToggleAccount = async (siteId: string, current: boolean) => {
+    if (!user) return;
+    const path = `users/${user.uid}/progress/${siteId}`;
+    const progressRef = doc(db, `users/${user.uid}/progress`, siteId);
+    const existing = userProgress[siteId];
+
+    try {
+      if (existing) {
+        await updateDoc(progressRef, {
+          hasAccount: !current
+        });
+      } else {
+        await setDoc(progressRef, {
+          siteId,
+          visitCount: 0,
+          hasAccount: !current,
+          lastCollectedAt: null
+        });
+      }
+      setNotification(`Account status updated for ${sites.find(s => s.id === siteId)?.name}`);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
     }
@@ -1273,8 +1406,8 @@ function App() {
       s.payoutMethods?.some(m => m.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-    if (filter === 'wheel') result = result.filter(s => s.isWheelBonus);
-    if (filter === 'instant') result = result.filter(s => s.payoutSpeedRank === 1);
+    if (filter === 'active') result = result.filter(s => userProgress[s.id]?.hasAccount);
+    if (filter === 'signup') result = result.filter(s => !userProgress[s.id]?.hasAccount);
     if (selectedMethod !== 'all') {
       result = result.filter(s => s.payoutMethods?.includes(selectedMethod));
     }
@@ -1287,6 +1420,24 @@ function App() {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
       if (sortBy === 'payout') return a.payoutSpeedRank - b.payoutSpeedRank;
       if (sortBy === 'min') return a.minPayoutSC - b.minPayoutSC;
+      if (sortBy === 'minGC') return a.minPayoutGiftCard - b.minPayoutGiftCard;
+      if (sortBy === 'minCrypto') return a.minPayoutCrypto - b.minPayoutCrypto;
+      if (sortBy === 'welcome') return a.welcomeBonus.localeCompare(b.welcomeBonus);
+      if (sortBy === 'daily') {
+        const valA = parseFloat((a.dailyBonus || a.wheelBonus).replace(/[^0-9.]/g, '')) || 0;
+        const valB = parseFloat((b.dailyBonus || b.wheelBonus).replace(/[^0-9.]/g, '')) || 0;
+        return valB - valA; // Higher bonus first
+      }
+      if (sortBy === 'due') {
+        const lastA = userProgress[a.id]?.lastCollectedAt?.toMillis() || 0;
+        const lastB = userProgress[b.id]?.lastCollectedAt?.toMillis() || 0;
+        const now = Date.now();
+        const isDueA = (now - lastA) > 24 * 60 * 60 * 1000;
+        const isDueB = (now - lastB) > 24 * 60 * 60 * 1000;
+        if (isDueA && !isDueB) return -1;
+        if (!isDueA && isDueB) return 1;
+        return lastA - lastB;
+      }
       if (sortBy === 'method') {
         const methodA = a.payoutMethods?.[0] || 'zzz';
         const methodB = b.payoutMethods?.[0] || 'zzz';
@@ -1470,6 +1621,26 @@ function App() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 bg-white p-1 rounded-2xl border border-zinc-200 shadow-sm pr-3">
+                <div className="pl-3 text-[10px] font-bold text-zinc-400 uppercase tracking-widest border-r border-zinc-100 pr-3 mr-1">Sort By</div>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="px-2 py-2 bg-transparent text-xs font-bold uppercase tracking-wider outline-none text-zinc-600 cursor-pointer"
+                >
+                  <option value="name">Name</option>
+                  <option value="welcome">Welcome Bonus</option>
+                  <option value="daily">Daily Bonus</option>
+                  <option value="payout">Redemption Speed</option>
+                  <option value="min">Min Payout (SC)</option>
+                  <option value="minGC">Min Payout (GC)</option>
+                  <option value="minCrypto">Min Payout (Crypto)</option>
+                  <option value="due">Due (24h+)</option>
+                  <option value="last">Last Visited</option>
+                  <option value="method">Method</option>
+                </select>
+              </div>
+
               <div className="flex bg-white p-1 rounded-2xl border border-zinc-200 shadow-sm">
                 <select
                   value={selectedMethod}
@@ -1484,7 +1655,7 @@ function App() {
               </div>
 
               <div className="flex bg-white p-1 rounded-2xl border border-zinc-200 shadow-sm">
-                {(['all', 'wheel', 'instant'] as const).map((f) => (
+                {(['all', 'active', 'signup'] as const).map((f) => (
                   <button
                     key={f}
                     onClick={() => setFilter(f)}
@@ -1493,22 +1664,7 @@ function App() {
                       filter === f ? "bg-indigo-600 text-white shadow-md" : "text-zinc-400 hover:text-zinc-600"
                     )}
                   >
-                    {f}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex bg-white p-1 rounded-2xl border border-zinc-200 shadow-sm">
-                {(['name', 'payout', 'min', 'last', 'method'] as const).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setSortBy(s)}
-                    className={cn(
-                      "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all",
-                      sortBy === s ? "bg-zinc-900 text-white shadow-md" : "text-zinc-400 hover:text-zinc-600"
-                    )}
-                  >
-                    {s}
+                    {f === 'signup' ? 'Need Signup' : f}
                   </button>
                 ))}
               </div>
@@ -1565,39 +1721,59 @@ function App() {
             <div className="relative z-10">
               <h2 className="text-2xl font-bold mb-1">Launch Navigator</h2>
               <p className="text-indigo-200 text-sm mb-4">Sequential mode to breeze through your daily bonuses.</p>
-              <button
-                onClick={() => {
-                  setIsLaunchMode(!isLaunchMode);
-                  if (!isLaunchMode) setCurrentIndex(0);
-                }}
-                className={cn(
-                  "flex items-center gap-2 py-3 px-6 rounded-2xl font-bold transition-all active:scale-[0.98]",
-                  isLaunchMode 
-                    ? "bg-red-500 text-white hover:bg-red-600" 
-                    : "bg-white text-indigo-900 hover:bg-indigo-50"
-                )}
-              >
-                {isLaunchMode ? "Exit Launch Mode" : "Start Sequential Launch"}
-              </button>
+                <button
+                  onClick={() => {
+                    const newMode = !isLaunchMode;
+                    setIsLaunchMode(newMode);
+                    if (newMode) {
+                      setCurrentIndex(0);
+                      if (filteredSites.length > 0) {
+                        window.open(filteredSites[0].url, '_blank');
+                        handleVisit(filteredSites[0].id);
+                      }
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center gap-2 py-3 px-6 rounded-2xl font-bold transition-all active:scale-[0.98]",
+                    isLaunchMode 
+                      ? "bg-red-500 text-white hover:bg-red-600" 
+                      : "bg-white text-indigo-900 hover:bg-indigo-50"
+                  )}
+                >
+                  {isLaunchMode ? "Exit Launch Mode" : "Start Sequential Launch"}
+                </button>
             </div>
 
             {isLaunchMode && (
-              <div className="flex items-center gap-4 bg-white/10 p-4 rounded-2xl backdrop-blur-md">
+              <div className="flex items-center gap-6 bg-white/10 p-4 rounded-2xl backdrop-blur-md">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="autoLaunch"
+                    checked={autoLaunchNext}
+                    onChange={(e) => setAutoLaunchNext(e.target.checked)}
+                    className="w-4 h-4 rounded border-white/20 bg-white/10 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <label htmlFor="autoLaunch" className="text-[10px] font-bold uppercase text-indigo-200 cursor-pointer">
+                    Auto-Launch Next
+                  </label>
+                </div>
+                <div className="h-8 w-[1px] bg-white/20" />
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold uppercase text-indigo-200">Batch Size</span>
                   <select 
                     value={batchSize}
                     onChange={(e) => setBatchSize(Number(e.target.value))}
-                    className="bg-transparent text-white font-bold focus:outline-none"
+                    className="bg-transparent text-white font-bold focus:outline-none text-xs"
                   >
                     {[5, 10, 15, 20].map(n => <option key={n} value={n} className="text-zinc-900">{n} Sites</option>)}
                   </select>
                 </div>
                 <button 
                   onClick={handleLaunchBatch}
-                  className="py-2 px-4 bg-white text-indigo-900 rounded-xl font-bold text-sm hover:bg-indigo-50 transition-all"
+                  className="py-2 px-4 bg-white text-indigo-900 rounded-xl font-bold text-sm hover:bg-indigo-50 transition-all shadow-lg"
                 >
-                  Launch Next {batchSize}
+                  Launch Batch
                 </button>
               </div>
             )}
@@ -1623,6 +1799,19 @@ function App() {
                     Active Session: {currentIndex + 1} of {filteredSites.length}
                   </div>
                   <h2 className="text-4xl font-black text-zinc-900 mb-2">{filteredSites[currentIndex].name}</h2>
+                  <div className="flex flex-wrap gap-4 justify-center md:justify-start mb-4">
+                    <button
+                      onClick={() => handleToggleAccount(filteredSites[currentIndex].id, !!userProgress[filteredSites[currentIndex].id]?.hasAccount)}
+                      className={cn(
+                        "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all border-2",
+                        userProgress[filteredSites[currentIndex].id]?.hasAccount
+                          ? "bg-emerald-500 text-white border-emerald-600 shadow-lg"
+                          : "bg-zinc-100 text-zinc-500 border-zinc-200"
+                      )}
+                    >
+                      {userProgress[filteredSites[currentIndex].id]?.hasAccount ? "Account Active" : "Need Signup"}
+                    </button>
+                  </div>
                   <div className="flex flex-wrap gap-4 justify-center md:justify-start">
                     <div className="flex items-center gap-2 px-4 py-2 bg-zinc-100 rounded-xl text-sm font-medium">
                       <Coins size={16} className="text-amber-500" />
@@ -1644,13 +1833,26 @@ function App() {
                     <ChevronLeft size={24} />
                   </button>
                   
-                  <button
-                    onClick={() => handleCollect(filteredSites[currentIndex].id)}
-                    className="py-6 px-12 rounded-3xl bg-indigo-600 text-white text-xl font-black hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 active:scale-[0.95] flex items-center gap-3"
-                  >
-                    <CheckCircle2 size={28} />
-                    Collected & Next
-                  </button>
+                  <div className="flex items-center gap-4">
+                    <a
+                      href={filteredSites[currentIndex].url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => handleVisit(filteredSites[currentIndex].id)}
+                      className="py-6 px-8 rounded-3xl bg-zinc-900 text-white text-lg font-bold hover:bg-black transition-all shadow-xl flex items-center gap-2"
+                    >
+                      <ExternalLink size={24} />
+                      Visit Site
+                    </a>
+
+                    <button
+                      onClick={() => handleCollect(filteredSites[currentIndex].id)}
+                      className="py-6 px-12 rounded-3xl bg-indigo-600 text-white text-xl font-black hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 active:scale-[0.95] flex items-center gap-3"
+                    >
+                      <CheckCircle2 size={28} />
+                      Collected & Next
+                    </button>
+                  </div>
 
                   <button
                     onClick={() => setCurrentIndex(prev => Math.min(filteredSites.length - 1, prev + 1))}
@@ -1684,7 +1886,7 @@ function App() {
               className="inline-flex items-center gap-2 py-3 px-8 bg-zinc-900 text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-lg active:scale-[0.98]"
             >
               <Database size={18} />
-              Seed Database (80+ Sites)
+              Seed Database ({INITIAL_SITES_DATA.length} Sites)
             </button>
           </div>
         ) : (
@@ -1702,6 +1904,7 @@ function App() {
                     setIsSiteModalOpen(true);
                   }}
                   onAutoFill={handleAutoFill}
+                  onToggleAccount={handleToggleAccount}
                   isLaunchMode={isLaunchMode}
                 />
               ))}
